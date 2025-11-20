@@ -1,0 +1,502 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>QR Studio - Single File</title>
+    
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- React & ReactDOM -->
+    <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+    
+    <!-- Babel for JSX -->
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    
+    <!-- QRCode.js -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcode/1.5.1/qrcode.min.js"></script>
+
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&display=swap" rel="stylesheet">
+
+    <style>
+        body { font-family: 'Inter', sans-serif; }
+        canvas { image-rendering: pixelated; }
+    </style>
+</head>
+<body class="bg-slate-50 text-slate-800">
+
+    <div id="root"></div>
+
+    <script type="text/babel">
+        const { useState, useEffect, useRef } = React;
+
+        // --- CONFIGURATION ---
+        // REPLACE THIS URL WITH YOUR GITHUB RAW LINK
+        const DEFAULT_LOGO_URL = "https://raw.githubusercontent.com/github/explore/main/topics/github/github.png"; 
+        // ---------------------
+
+        // --- ICONS (Inline SVGs to avoid dependency issues) ---
+        const IconWrapper = ({ children, size = 24, className = "" }) => (
+            <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>{children}</svg>
+        );
+        const DownloadIcon = (p) => <IconWrapper {...p}><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></IconWrapper>;
+        const LinkIcon = (p) => <IconWrapper {...p}><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></IconWrapper>;
+        const MailIcon = (p) => <IconWrapper {...p}><rect width="20" height="16" x="2" y="4" rx="2"/><path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7"/></IconWrapper>;
+        const WifiIcon = (p) => <IconWrapper {...p}><path d="M5 12.55a11 11 0 0 1 14.08 0"/><path d="M1.42 9a16 16 0 0 1 21.16 0"/><path d="M8.53 16.11a6 6 0 0 1 6.95 0"/><line x1="12" x2="12.01" y1="20" y2="20"/></IconWrapper>;
+        const TypeIcon = (p) => <IconWrapper {...p}><polyline points="4 7 4 4 20 4 20 7"/><line x1="9" x2="15" y1="20" y2="20"/><line x1="12" x2="12" y1="4" y2="20"/></IconWrapper>;
+        const Share2Icon = (p) => <IconWrapper {...p}><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.59" x2="15.42" y1="13.51" y2="17.49"/><line x1="15.41" x2="8.59" y1="6.51" y2="10.49"/></IconWrapper>;
+        const PaletteIcon = (p) => <IconWrapper {...p}><circle cx="13.5" cy="6.5" r=".5" fill="currentColor"/><circle cx="17.5" cy="10.5" r=".5" fill="currentColor"/><circle cx="8.5" cy="7.5" r=".5" fill="currentColor"/><circle cx="6.5" cy="12.5" r=".5" fill="currentColor"/><path d="M12 2C6.5 2 2 6.5 2 12s4.5 10 10 10c.926 0 1.648-.746 1.648-1.688 0-.437-.18-.835-.437-1.125-.29-.289-.438-.652-.438-1.125a1.64 1.64 0 0 1 1.668-1.668h1.996c3.051 0 5.555-2.503 5.555-5.554C21.965 6.012 17.461 2 12 2z"/></IconWrapper>;
+        const ImageIcon = (p) => <IconWrapper {...p}><rect width="18" height="18" x="3" y="3" rx="2" ry="2"/><circle cx="9" cy="9" r="2"/><path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21"/></IconWrapper>;
+        const Trash2Icon = (p) => <IconWrapper {...p}><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/><line x1="10" x2="10" y1="11" y2="17"/><line x1="14" x2="14" y1="11" y2="17"/></IconWrapper>;
+        const HistoryIcon = (p) => <IconWrapper {...p}><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 12"/><path d="M3 3v9h9"/><path d="M12 7v5l3 3"/></IconWrapper>;
+        const UploadIcon = (p) => <IconWrapper {...p}><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" x2="12" y1="3" y2="15"/></IconWrapper>;
+        const StarIcon = (p) => <IconWrapper {...p}><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></IconWrapper>;
+        const Wand2Icon = (p) => <IconWrapper {...p}><path d="m21.64 3.64-1.28-1.28a1.21 1.21 0 0 0-1.72 0L2.36 18.64a1.21 1.21 0 0 0 0 1.72l1.28 1.28a1.2 1.2 0 0 0 1.72 0L21.64 5.36a1.2 1.2 0 0 0 0-1.72Z"/><path d="m14 7 3 3"/><path d="M5 6v4"/><path d="M19 14v4"/><path d="M10 2v2"/><path d="M7 8H3"/><path d="M21 16h-4"/><path d="M11 3H9"/></IconWrapper>;
+        const RefreshCcwIcon = (p) => <IconWrapper {...p}><path d="M21 12a9 9 0 0 0-9-9 9.75 9.75 0 0 0-6.74 2.74L3 12"/><path d="M3 3v9h9"/><path d="M3 12a9 9 0 0 0 9 9 9.75 9.75 0 0 0 6.74-2.74L21 12"/></IconWrapper>;
+        const XCircleIcon = (p) => <IconWrapper {...p}><circle cx="12" cy="12" r="10"/><path d="m15 9-6 6"/><path d="m9 9 6 6"/></IconWrapper>;
+        const PlusCircleIcon = (p) => <IconWrapper {...p}><circle cx="12" cy="12" r="10"/><path d="M8 12h8"/><path d="M12 8v8"/></IconWrapper>;
+
+        // --- CONSTANTS ---
+        const ICONS = {
+            none: null,
+            link: { path: "M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71", color: "#2563eb" },
+            wifi: { path: "M5 12.55a11 11 0 0 1 14.08 0 M1.42 9a16 16 0 0 1 21.16 0 M8.53 16.11a6 6 0 0 1 6.95 0 M12 20h.01", color: "#dc2626" },
+            mail: { path: "M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z M22 6l-10 7L2 6", color: "#ea580c" },
+            text: { path: "M17 6.1H3 M21 12.1H3 M15.1 18H3", color: "#16a34a" }
+        };
+
+        function App() {
+            const canvasRef = useRef(null);
+            const fileInputRef = useRef(null);
+            
+            const [text, setText] = useState("https://example.com");
+            const [title, setTitle] = useState("");
+            const [fgColor, setFgColor] = useState("#000000");
+            const [bgColor, setBgColor] = useState("#ffffff");
+            const [selectedIcon, setSelectedIcon] = useState("none");
+            
+            const [customLogo, setCustomLogo] = useState(null);
+            const [gradientColors, setGradientColors] = useState(["#000000", "#555555", "#aaaaaa"]);
+            const [useLogoColors, setUseLogoColors] = useState(false);
+            const [history, setHistory] = useState([]);
+            const [isGenerating, setIsGenerating] = useState(false);
+
+            // Helper: Extract colors from image
+            const extractColors = (imageSrc) => {
+                const img = new Image();
+                img.crossOrigin = "Anonymous"; // Crucial for GitHub images
+                img.onload = () => {
+                    const cvs = document.createElement('canvas');
+                    cvs.width = 100;
+                    cvs.height = 100;
+                    const ctx = cvs.getContext('2d');
+                    ctx.drawImage(img, 0, 0, 100, 100);
+                    
+                    try {
+                        const imageData = ctx.getImageData(0, 0, 100, 100).data;
+                        const colorCounts = {};
+                        
+                        for(let i = 0; i < imageData.length; i += 4 * 10) { 
+                            const r = imageData[i];
+                            const g = imageData[i+1];
+                            const b = imageData[i+2];
+                            const a = imageData[i+3];
+                            if(a < 128) continue; 
+                            if(r > 240 && g > 240 && b > 240) continue;
+                            const rR = Math.round(r/20)*20;
+                            const gR = Math.round(g/20)*20;
+                            const bR = Math.round(b/20)*20;
+                            const key = `#${(1 << 24 | rR << 16 | gR << 8 | bR).toString(16).slice(1)}`;
+                            colorCounts[key] = (colorCounts[key] || 0) + 1;
+                        }
+                        
+                        const sortedColors = Object.entries(colorCounts)
+                            .sort(([,a], [,b]) => b - a)
+                            .map(([k]) => k)
+                            .slice(0, 3);
+                            
+                        if (sortedColors.length > 0) {
+                            let newColors = [...sortedColors];
+                            while (newColors.length < 3) newColors.push("#aaaaaa");
+                            setGradientColors(newColors);
+                            setUseLogoColors(true);
+                        }
+                    } catch (e) {
+                        console.warn("Cannot extract colors (CORS issue likely):", e);
+                    }
+                };
+                img.src = imageSrc;
+            };
+
+            const handleFileUpload = (e) => {
+                const file = e.target.files[0];
+                if (file) {
+                    const reader = new FileReader();
+                    reader.onload = (event) => {
+                        const result = event.target.result;
+                        setCustomLogo(result);
+                        setSelectedIcon('custom');
+                        extractColors(result);
+                    };
+                    reader.readAsDataURL(file);
+                }
+            };
+
+            const addGradientColor = () => {
+                if (gradientColors.length < 3) setGradientColors([...gradientColors, "#cccccc"]);
+            };
+
+            const removeGradientColor = (index) => {
+                if (gradientColors.length > 1) setGradientColors(gradientColors.filter((_, i) => i !== index));
+            };
+
+            const generateQR = async () => {
+                if (!window.QRCode || !canvasRef.current) return;
+                
+                setIsGenerating(true);
+                const canvas = canvasRef.current;
+                const ctx = canvas.getContext('2d');
+                const qrSize = 1000;
+                const padding = 80;
+                const titleHeight = title ? 120 : 0;
+                const totalHeight = qrSize + (title ? titleHeight + 40 : 0);
+                
+                canvas.width = qrSize;
+                canvas.height = totalHeight;
+
+                try {
+                    // 1. Background
+                    ctx.fillStyle = bgColor;
+                    ctx.fillRect(0, 0, qrSize, totalHeight);
+
+                    // 2. QR Base
+                    const tempCanvas = document.createElement('canvas');
+                    await window.QRCode.toCanvas(tempCanvas, text, {
+                        width: qrSize - (padding * 2),
+                        margin: 0,
+                        color: { dark: '#000000', light: '#00000000' },
+                        errorCorrectionLevel: 'H'
+                    });
+
+                    // 3. Gradient / Color Logic
+                    let currentFgColor = fgColor;
+
+                    if (useLogoColors && selectedIcon !== 'none') {
+                        if (selectedIcon === 'default') {
+                            // Default Logo Gradient (Blue-Yellow-Red)
+                            const gradient = ctx.createLinearGradient(padding, padding, qrSize - padding, qrSize - padding);
+                            gradient.addColorStop(0, "#2563eb");
+                            gradient.addColorStop(0.5, "#facc15");
+                            gradient.addColorStop(1, "#dc2626");
+                            currentFgColor = gradient;
+                        } else if (selectedIcon === 'custom' && gradientColors.length > 0) {
+                            // Custom Gradient
+                            const gradient = ctx.createLinearGradient(padding, padding, qrSize - padding, qrSize - padding);
+                            gradientColors.forEach((color, index) => {
+                                const stop = index / (gradientColors.length > 1 ? gradientColors.length - 1 : 1);
+                                gradient.addColorStop(stop, color);
+                            });
+                            currentFgColor = gradient;
+                        } else if (ICONS[selectedIcon]) {
+                            currentFgColor = ICONS[selectedIcon].color;
+                        }
+                    }
+
+                    // 4. Apply Color
+                    const layerCanvas = document.createElement('canvas');
+                    layerCanvas.width = qrSize;
+                    layerCanvas.height = totalHeight;
+                    const layerCtx = layerCanvas.getContext('2d');
+                    layerCtx.fillStyle = currentFgColor;
+                    layerCtx.fillRect(0, 0, qrSize, totalHeight);
+                    layerCtx.globalCompositeOperation = 'destination-in';
+                    layerCtx.drawImage(tempCanvas, padding, padding);
+                    ctx.drawImage(layerCanvas, 0, 0);
+
+                    // 5. Draw Icon
+                    if (selectedIcon !== 'none') {
+                        const iconBoxSize = qrSize * 0.24;
+                        const iconX = (qrSize - iconBoxSize) / 2;
+                        const iconY = padding + (qrSize - (padding*2) - iconBoxSize) / 2;
+
+                        ctx.fillStyle = bgColor;
+                        ctx.beginPath();
+                        ctx.roundRect(iconX - 5, iconY - 5, iconBoxSize + 10, iconBoxSize + 10, 20);
+                        ctx.fill();
+                        
+                        let imgSource = null;
+                        let isSvg = false;
+
+                        if (selectedIcon === 'custom' && customLogo) {
+                            imgSource = customLogo;
+                        } else if (selectedIcon === 'default') {
+                            imgSource = DEFAULT_LOGO_URL;
+                        } else if (ICONS[selectedIcon]) {
+                            const iconData = ICONS[selectedIcon];
+                            const svgString = `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="${iconData.color}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${iconData.path}</svg>`;
+                            const svgBlob = new Blob([svgString], {type: 'image/svg+xml;charset=utf-8'});
+                            imgSource = URL.createObjectURL(svgBlob);
+                            isSvg = true;
+                        }
+
+                        if (imgSource) {
+                            const img = new Image();
+                            img.crossOrigin = "Anonymous";
+                            await new Promise((resolve) => {
+                                img.onload = () => {
+                                    if (!isSvg) {
+                                        const scale = Math.min(iconBoxSize / img.width, iconBoxSize / img.height);
+                                        const w = img.width * scale;
+                                        const h = img.height * scale;
+                                        const cx = iconX + (iconBoxSize - w) / 2;
+                                        const cy = iconY + (iconBoxSize - h) / 2;
+                                        
+                                        ctx.save();
+                                        ctx.beginPath();
+                                        ctx.roundRect(cx, cy, w, h, 15);
+                                        ctx.clip();
+                                        ctx.drawImage(img, cx, cy, w, h);
+                                        ctx.restore();
+                                    } else {
+                                        ctx.drawImage(img, iconX, iconY, iconBoxSize, iconBoxSize);
+                                        URL.revokeObjectURL(imgSource);
+                                    }
+                                    resolve();
+                                };
+                                img.onerror = () => {
+                                    console.error("Could not load image", imgSource);
+                                    resolve(); // Fail gracefully
+                                };
+                                img.src = imgSource;
+                            });
+                        }
+                    }
+
+                    // 6. Draw Title
+                    if (title) {
+                        let titleColor = fgColor;
+                        if (useLogoColors) {
+                            if (selectedIcon === 'default') titleColor = '#2563eb';
+                            if (selectedIcon === 'custom' && gradientColors.length > 0) titleColor = gradientColors[0];
+                        }
+                        ctx.fillStyle = titleColor;
+                        ctx.font = `bold 60px 'Segoe UI', Roboto, Helvetica, Arial, sans-serif`;
+                        ctx.textAlign = 'center';
+                        ctx.textBaseline = 'middle';
+                        ctx.fillText(title, qrSize / 2, qrSize + (titleHeight / 2));
+                    }
+
+                } catch (err) {
+                    console.error("QR Generation Error", err);
+                }
+                setIsGenerating(false);
+            };
+
+            useEffect(() => {
+                const timer = setTimeout(() => generateQR(), 300);
+                return () => clearTimeout(timer);
+            }, [text, title, fgColor, bgColor, selectedIcon, customLogo, useLogoColors, gradientColors]);
+
+            const downloadQR = () => {
+                const canvas = canvasRef.current;
+                if (!canvas) return;
+                const link = document.createElement('a');
+                link.download = `qrcode-${title || 'download'}.png`;
+                link.href = canvas.toDataURL("image/png");
+                link.click();
+                
+                const newItem = { text, title, fgColor, bgColor, selectedIcon, useLogoColors, gradientColors, date: new Date().toLocaleTimeString() };
+                if (history.length === 0 || JSON.stringify(history[0]) !== JSON.stringify(newItem)) {
+                    setHistory([newItem, ...history].slice(0, 5));
+                }
+            };
+
+            const restoreFromHistory = (item) => {
+                setText(item.text);
+                setTitle(item.title);
+                setFgColor(item.fgColor);
+                setBgColor(item.bgColor);
+                setSelectedIcon(item.selectedIcon);
+                setUseLogoColors(item.useLogoColors || false); 
+                setGradientColors(item.gradientColors || ["#000000", "#555555", "#aaaaaa"]);
+            };
+
+            return (
+                <div className="min-h-screen bg-slate-50">
+                    {/* Header */}
+                    <header className="bg-white border-b border-slate-200 sticky top-0 z-10">
+                        <div className="max-w-6xl mx-auto px-4 h-16 flex items-center justify-between">
+                            <div className="flex items-center gap-2">
+                                <div className="bg-indigo-600 p-2 rounded-lg text-white">
+                                    <Share2Icon size={20} />
+                                </div>
+                                <h1 className="text-xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-indigo-600 to-violet-600">QR Studio</h1>
+                            </div>
+                        </div>
+                    </header>
+
+                    <main className="max-w-6xl mx-auto p-4 md:p-6 lg:p-8">
+                        <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
+                            {/* Controls */}
+                            <div className="lg:col-span-5 space-y-6">
+                                <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6">
+                                    <div className="flex items-center gap-2 mb-4 text-slate-700 font-semibold">
+                                        <LinkIcon size={18} className="text-indigo-500" />
+                                        <h2>Content</h2>
+                                    </div>
+                                    <div className="space-y-4">
+                                        <div>
+                                            <label className="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-1.5">Target URL</label>
+                                            <input type="text" value={text} onChange={(e) => setText(e.target.value)} className="w-full px-4 py-3 rounded-xl bg-slate-50 border border-slate-200 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-200 outline-none transition-all" />
+                                        </div>
+                                        <div>
+                                            <label className="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-1.5">Title</label>
+                                            <input type="text" value={title} onChange={(e) => setTitle(e.target.value)} className="w-full px-4 py-3 rounded-xl bg-slate-50 border border-slate-200 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-200 outline-none transition-all" />
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6">
+                                    <div className="flex items-center gap-2 mb-4 text-slate-700 font-semibold">
+                                        <PaletteIcon size={18} className="text-pink-500" />
+                                        <h2>Appearance</h2>
+                                    </div>
+                                    <div className="grid grid-cols-2 gap-4 mb-6">
+                                        <div className={useLogoColors ? "opacity-50 pointer-events-none" : ""}>
+                                            <label className="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-1.5">Foreground</label>
+                                            <div className="flex items-center gap-2">
+                                                <input type="color" value={fgColor} onChange={(e) => setFgColor(e.target.value)} className="h-10 w-10 rounded-lg cursor-pointer border-0 p-0 overflow-hidden" />
+                                                <span className="text-sm font-mono text-slate-500">{fgColor}</span>
+                                            </div>
+                                        </div>
+                                        <div>
+                                            <label className="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-1.5">Background</label>
+                                            <div className="flex items-center gap-2">
+                                                <input type="color" value={bgColor} onChange={(e) => setBgColor(e.target.value)} className="h-10 w-10 rounded-lg cursor-pointer border-0 p-0 overflow-hidden" />
+                                                <span className="text-sm font-mono text-slate-500">{bgColor}</span>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <div className="mb-2">
+                                        <label className="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-3">Center Icon</label>
+                                        <div className="grid grid-cols-3 gap-2">
+                                            {[
+                                                { id: 'none', icon: <ImageIcon size={18} />, label: 'None' },
+                                                { id: 'default', icon: <StarIcon size={18} />, label: 'Default Logo' },
+                                                { id: 'link', icon: <LinkIcon size={18} />, label: 'Link' },
+                                                { id: 'wifi', icon: <WifiIcon size={18} />, label: 'WiFi' },
+                                                { id: 'mail', icon: <MailIcon size={18} />, label: 'Mail' },
+                                                { id: 'text', icon: <TypeIcon size={18} />, label: 'Text' },
+                                            ].map((opt) => (
+                                                <button key={opt.id} onClick={() => setSelectedIcon(opt.id)} className={`flex flex-col items-center justify-center p-2 rounded-xl border transition-all ${selectedIcon === opt.id ? 'bg-indigo-50 border-indigo-500 text-indigo-600 ring-1 ring-indigo-500' : 'bg-slate-50 border-slate-200 text-slate-500 hover:bg-slate-100 hover:border-slate-300'}`}>
+                                                    <div className="mb-1">{opt.icon}</div>
+                                                    <span className="text-[10px] font-medium">{opt.label}</span>
+                                                </button>
+                                            ))}
+                                        </div>
+
+                                        <div className="mt-3">
+                                            <input type="file" ref={fileInputRef} className="hidden" accept="image/*" onChange={handleFileUpload} />
+                                            <button onClick={() => fileInputRef.current?.click()} className={`w-full flex items-center justify-center gap-2 p-2.5 rounded-xl border transition-all text-xs font-medium ${selectedIcon === 'custom' ? 'bg-indigo-50 border-indigo-500 text-indigo-600 ring-1 ring-indigo-500' : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-50 hover:border-slate-300'}`}>
+                                                <UploadIcon size={14} />
+                                                {customLogo && selectedIcon === 'custom' ? 'Change Logo' : 'Upload Custom Logo'}
+                                            </button>
+                                        </div>
+
+                                        {selectedIcon !== 'none' && (
+                                            <div className="mt-4 bg-indigo-50 border border-indigo-100 rounded-xl p-3 flex flex-col gap-3">
+                                                <label className="flex items-center justify-between cursor-pointer">
+                                                    <div className="flex items-center gap-3">
+                                                        <div className="p-2 bg-white rounded-full text-indigo-600 shadow-sm"><Wand2Icon size={16} /></div>
+                                                        <span className="text-xs font-bold text-indigo-900">Match Logo Colors</span>
+                                                    </div>
+                                                    <div className="relative inline-flex items-center cursor-pointer">
+                                                        <input type="checkbox" checked={useLogoColors} onChange={(e) => setUseLogoColors(e.target.checked)} className="sr-only peer" />
+                                                        <div className="w-9 h-5 bg-slate-200 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-indigo-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-indigo-600"></div>
+                                                    </div>
+                                                </label>
+
+                                                {useLogoColors && selectedIcon === 'custom' && (
+                                                    <div className="space-y-2 pt-2 border-t border-indigo-100 mt-3">
+                                                        <p className="text-xs text-indigo-700 font-medium">Gradient colors (Max 3):</p>
+                                                        <div className="flex gap-2 items-center flex-wrap">
+                                                            {gradientColors.map((color, index) => (
+                                                                <div key={index} className="relative flex items-center gap-1">
+                                                                    <input type="color" value={color} onChange={(e) => { const newColors = [...gradientColors]; newColors[index] = e.target.value; setGradientColors(newColors); }} className="h-8 w-8 rounded-md cursor-pointer border-0 p-0 overflow-hidden shadow-sm" />
+                                                                    {gradientColors.length > 1 && (
+                                                                        <button onClick={() => removeGradientColor(index)} className="text-red-500 hover:text-red-700 ml-1"><XCircleIcon size={16} /></button>
+                                                                    )}
+                                                                </div>
+                                                            ))}
+                                                            {gradientColors.length < 3 && (
+                                                                <button onClick={addGradientColor} className="flex items-center gap-1 text-indigo-600 hover:text-indigo-800 text-xs font-medium mt-2"><PlusCircleIcon size={16} /> Add</button>
+                                                            )}
+                                                        </div>
+                                                    </div>
+                                                )}
+                                            </div>
+                                        )}
+                                    </div>
+                                </div>
+
+                                {history.length > 0 && (
+                                    <div className="bg-slate-100/50 rounded-2xl p-6 border border-slate-200">
+                                        <div className="flex items-center gap-2 mb-4 text-slate-700 font-semibold">
+                                            <HistoryIcon size={18} className="text-slate-500" />
+                                            <h2>Recent</h2>
+                                        </div>
+                                        <div className="space-y-2">
+                                            {history.map((item, idx) => (
+                                                <button key={idx} onClick={() => restoreFromHistory(item)} className="w-full text-left p-3 bg-white rounded-lg border border-slate-200 shadow-sm hover:border-indigo-300 hover:shadow-md transition-all flex items-center justify-between group">
+                                                    <div className="flex items-center gap-3 overflow-hidden">
+                                                        <div className="w-4 h-4 rounded-full border border-gray-200 flex-shrink-0" style={{background: item.fgColor}} />
+                                                        <div className="truncate">
+                                                            <div className="text-xs font-bold text-slate-700 truncate">{item.title || "Untitled"}</div>
+                                                            <div className="text-[10px] text-slate-400 truncate">{item.text}</div>
+                                                        </div>
+                                                    </div>
+                                                    <RefreshCcwIcon size={14} className="text-slate-400 opacity-0 group-hover:opacity-100 transition-opacity" />
+                                                </button>
+                                            ))}
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
+
+                            {/* Preview */}
+                            <div className="lg:col-span-7">
+                                <div className="sticky top-24">
+                                    <div className="bg-slate-900 rounded-3xl p-8 shadow-2xl flex flex-col items-center justify-center min-h-[500px] relative overflow-hidden">
+                                        <div className="absolute top-0 left-0 w-full h-full opacity-30 pointer-events-none">
+                                            <div className="absolute top-[-10%] left-[-10%] w-64 h-64 bg-indigo-500 rounded-full blur-[100px]"></div>
+                                            <div className="absolute bottom-[-10%] right-[-10%] w-64 h-64 bg-purple-500 rounded-full blur-[100px]"></div>
+                                        </div>
+                                        <div className="relative z-10 bg-white p-4 rounded-2xl shadow-lg transition-transform duration-300 hover:scale-[1.02]">
+                                            <canvas ref={canvasRef} className="w-full max-w-[350px] h-auto rounded-lg" />
+                                        </div>
+                                        <div className="relative z-10 mt-8 flex flex-wrap justify-center gap-4 w-full max-w-md">
+                                            <button onClick={downloadQR} disabled={!text} className="flex-1 flex items-center justify-center gap-2 bg-indigo-600 hover:bg-indigo-500 text-white px-6 py-4 rounded-xl font-semibold shadow-lg shadow-indigo-900/20 transition-all transform hover:-translate-y-1 active:translate-y-0 disabled:opacity-50 disabled:cursor-not-allowed">
+                                                <DownloadIcon size={20} /> Download PNG
+                                            </button>
+                                            <button onClick={() => { setText(""); setTitle(""); setSelectedIcon("none"); setCustomLogo(null); setUseLogoColors(false); }} className="flex items-center justify-center gap-2 bg-slate-800 hover:bg-slate-700 text-slate-300 px-6 py-4 rounded-xl font-semibold transition-all border border-slate-700">
+                                                <Trash2Icon size={20} />
+                                            </button>
+                                        </div>
+                                        <p className="relative z-10 mt-6 text-slate-500 text-sm font-medium">High resolution output</p>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </main>
+                </div>
+            );
+        }
+
+        ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+    </script>
+</body>
+</html>
